@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/elazarl/goproxy"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -12,39 +11,96 @@ import (
 	"path"
 	"runtime"
 	"syscall"
+
+	"github.com/elazarl/goproxy"
+	"gopkg.in/natefinch/lumberjack.v2"
+
+	"github.com/shuge/goproxy/g"
 )
 
+
+const (
+	defaultProfHTTP = "localhost:6060"
+)
+
+
 var (
-	version        bool
-	verbose        bool
-	pid            string
+	cfg string
 	buildTimestamp string
-	addr           string
+	printBuildTimestamp bool
+
 )
 
 func main() {
-	flag.BoolVar(&verbose, "verbose", false, "print proxy request to stdout")
-	flag.BoolVar(&verbose, "version", false, "print version")
-	flag.StringVar(&addr, "addr", ":8118", "proxy listen address")
-	flag.StringVar(&pid, "pid", "", "full path to pid")
+	flag.BoolVar(&printBuildTimestamp, "v", false, "print build timestamp ")
+	flag.StringVar(&cfg, "c", "", "full path to configuration file")
 	flag.Parse()
 
-	if version {
+	if printBuildTimestamp {
 		fmt.Println(buildTimestamp)
 		os.Exit(0)
 	}
 
-	if pid != "" {
-		parent := path.Dir(pid)
+	if cfg == "" {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	err := g.ParseConfig(cfg)
+	if err != nil {
+		log.Fatalln(fmt.Sprintf("[fatal] g.ParseConfig -%s- failed", cfg), err)
+	}
+
+	flags := log.Ldate | log.Ltime | log.Lshortfile
+	log.SetFlags(flags)
+	if g.Cfgs.Debug {
+		log.SetFlags(flags)
+	}
+
+	var output *lumberjack.Logger
+	if g.Cfgs.Logpath != "" {
+		output = &lumberjack.Logger{
+			Filename:   g.Cfgs.Logpath,
+			MaxSize:    100, // megabytes
+			MaxBackups: 10,
+			MaxAge:     30,   //days
+			Compress:   true, // disabled by default
+		}
+		log.SetOutput(output)
+	}
+
+	if g.Cfgs.Prof {
+		go func() {
+			var addr string
+			if g.Cfgs.ProfHTTP == "" {
+				addr = defaultProfHTTP
+			} else {
+				addr = g.Cfgs.ProfHTTP
+			}
+
+			err := http.ListenAndServe(addr, nil)
+			if err != nil {
+				log.Println(fmt.Sprintf("[error] http.ListenAndServe %s", addr), err)
+			}
+		}()
+	}
+
+
+
+	if g.Cfgs.Pidpath != "" {
+		parent := path.Dir(g.Cfgs.Pidpath)
 		_, err := os.Stat(parent)
 		if err != nil && os.IsNotExist(err) {
-			os.MkdirAll(parent, 0755)
+			err := os.MkdirAll(parent, 0755)
+			if err != nil {
+				log.Println(fmt.Sprintf("[error] os.MkdirAll -%s- failed", parent))
+			}
 		}
 
 		content := fmt.Sprintf("%#v", os.Getpid())
-		err = ioutil.WriteFile(pid, []byte(content), 0644)
+		err = ioutil.WriteFile(g.Cfgs.Pidpath, []byte(content), 0644)
 		if err != nil {
-			log.Fatalln(err)
+			log.Println("[error] ioutil.WriteFile failed", err)
 		}
 	}
 
@@ -57,10 +113,10 @@ func main() {
 	go func() {
 		<-sigs
 
-		if pid != "" {
-			err := os.Remove(pid)
+		if g.Cfgs.Pidpath != "" {
+			err := os.Remove(g.Cfgs.Pidpath)
 			if err != nil {
-				log.Println("os.Remove failed")
+				log.Println(fmt.Sprintf("[error] os.Remove -%s-", g.Cfgs.Pidpath), err)
 			}
 		}
 
@@ -70,10 +126,11 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	proxy := goproxy.NewProxyHttpServer()
-	proxy.Verbose = verbose
-	err := http.ListenAndServe(addr, proxy)
+	proxy.Verbose = g.Cfgs.Debug
+	proxy.Logger = log.New(output, "", log.LstdFlags)
+	err = http.ListenAndServe(g.Cfgs.ListenHTTP, proxy)
 	if err != nil {
-		log.Println(err)
+		log.Println(fmt.Sprintf("[error] http.ListenAndServe -%s-", g.Cfgs.ListenHTTP), err)
 	}
 
 }

@@ -1,0 +1,8 @@
+{
+    "prof": false,
+    "profHTTP": "127.0.0.1:6060",
+    "listenHTTP": "0.0.0.0:8118",
+    "logpath": "/data/log/hm/goproxy/main.log",
+    "pidpath": "/data/log/hm/goproxy/main.pid",
+    "debug": true
+}

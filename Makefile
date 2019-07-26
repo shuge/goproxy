@@ -1,2 +1,8 @@
+TIMESTAMP=`date +%Y%m%d.%H%M%S`
+COMMIT=`git log --format="%H" -n 1`
+
 all:
-	timestamp=`date +%Y%m%d.%H%M%S` commit=`git log --format="%H" -n 1` go build -o goproxy.bin -ldflags "-X main.buildTimestamp=build=$timestamp;commit=$commit"
+	go build -o goproxy.bin -ldflags "-X main.buildTimestamp=build=$(TIMESTAMP);commit=$(COMMIT)" main.go
+
+clean:
+	rm goproxy.bin
