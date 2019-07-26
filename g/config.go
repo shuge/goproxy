@@ -13,6 +13,7 @@ type configs struct {
 	Prof       bool   `json:"prof"`
 	ProfHTTP   string `json:"profHTTP"`
 
+	Whitelist []string `json:"whitelist"`
 	Pidpath string `json:"pidpath"`
 }
 
