@@ -1,8 +1,8 @@
 {
-    "whitelist": [],
+    "whitelist": ["0.0.0.0/0","127.0.0.1"],
     "prof": false,
     "profHTTP": "127.0.0.1:6060",
-    "listenHTTP": "0.0.0.0:8118",
+    "listenHTTP": "0.0.0.0:9090",
     "logpath": "",
     "pidpath": "/data/log/hm/goproxy/main.pid",
     "debug": true

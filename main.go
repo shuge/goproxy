@@ -16,19 +16,18 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/shuge/goproxy/g"
+	"github.com/shuge/goproxy/util"
+	"github.com/shuge/goproxy/whitelist"
 )
-
 
 const (
 	defaultProfHTTP = "localhost:6060"
 )
 
-
 var (
-	cfg string
-	buildTimestamp string
+	cfg                 string
+	buildTimestamp      string
 	printBuildTimestamp bool
-
 )
 
 func main() {
@@ -85,8 +84,6 @@ func main() {
 		}()
 	}
 
-
-
 	if g.Cfgs.Pidpath != "" {
 		parent := path.Dir(g.Cfgs.Pidpath)
 		_, err := os.Stat(parent)
@@ -126,12 +123,19 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	proxy := goproxy.NewProxyHttpServer()
+
+	// custom logging output
 	proxy.Verbose = g.Cfgs.Debug
 	if output == nil {
-		proxy.Logger = log.New(os.Stderr, "", log.LstdFlags)
+		proxy.Logger = log.New(os.Stdout, "", log.LstdFlags)
 	} else {
 		proxy.Logger = log.New(output, "", log.LstdFlags)
 	}
+
+	// whitelist base on CIDR
+	whitelist.Load(g.Cfgs.Whitelist)
+	proxy.OnRequest().DoFunc(util.ProxyOnReqInWhitelist)
+
 	err = http.ListenAndServe(g.Cfgs.ListenHTTP, proxy)
 	if err != nil {
 		log.Println(fmt.Sprintf("[error] http.ListenAndServe -%s-", g.Cfgs.ListenHTTP), err)

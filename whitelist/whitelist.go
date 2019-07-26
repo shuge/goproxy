@@ -1,26 +1,32 @@
 package whitelist
 
 import (
-	"golang.org/x/tools/go/ssa/interp/testdata/src/strings"
 	"log"
 	"net"
+	"strings"
 )
 
 var IpNetworkWhiteList *[]net.IPNet
 var IpAddrWhiteList *[]string
 
 func InWhitelist(ipaddr string) bool {
-	for _, item := range *IpNetworkWhiteList {
-		ip := net.ParseIP(ipaddr)
-		if item.Contains(ip) {
-			return true
+	log.Println("[debug] ipaddr", ipaddr)
+	ip := net.ParseIP(ipaddr)
+
+	if IpAddrWhiteList != nil {
+		for _, item := range *IpAddrWhiteList {
+			if item == ipaddr {
+				return true
+
+			}
 		}
 	}
 
-	for _, item := range *IpAddrWhiteList {
-		if item == ipaddr {
-			return true
-
+	if IpNetworkWhiteList != nil && ip != nil {
+		for _, item := range *IpNetworkWhiteList {
+			if item.Contains(ip) {
+				return true
+			}
 		}
 	}
 
@@ -28,10 +34,11 @@ func InWhitelist(ipaddr string) bool {
 }
 
 func Load(records []string) {
-	var ipNetworkWhiteList  []net.IPNet
+	var ipNetworkWhiteList []net.IPNet
 	var ipAddrWhiteList []string
 
 	empty := []string{
+		"127.0.0.1",
 		"0.0.0.0/0",
 	}
 
@@ -39,11 +46,11 @@ func Load(records []string) {
 		records = empty
 	}
 
-	for _ , record := range records {
+	for _, record := range records {
 		if strings.Index(record, "/") != -1 {
 			_, ipnet, err := net.ParseCIDR(record)
 			if err != nil {
-				log.Println("[error] net.ParseCIDR", record,err)
+				log.Println("[error] net.ParseCIDR", record, err)
 				continue
 			} else {
 				ipNetworkWhiteList = append(ipNetworkWhiteList, *ipnet)
@@ -51,17 +58,17 @@ func Load(records []string) {
 		} else {
 			ipa := net.ParseIP(record)
 			if ipa == nil {
-log.Println("[error] net.ParseIP", record)
-continue
+				log.Println("[error] net.ParseIP", record)
+				continue
 			} else {
 				ipAddrWhiteList = append(ipAddrWhiteList, record)
 			}
 		}
 	}
 
-		IpNetworkWhiteList = &ipNetworkWhiteList
+	IpNetworkWhiteList = &ipNetworkWhiteList
 	IpAddrWhiteList = &ipAddrWhiteList
 
-
-
+	log.Println("[debug] network whitelist", IpNetworkWhiteList)
+	log.Println("[debug] ipaddr whitelist", IpAddrWhiteList)
 }
