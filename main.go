@@ -127,7 +127,11 @@ func main() {
 
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.Verbose = g.Cfgs.Debug
-	proxy.Logger = log.New(output, "", log.LstdFlags)
+	if output == nil {
+		proxy.Logger = log.New(os.Stderr, "", log.LstdFlags)
+	} else {
+		proxy.Logger = log.New(output, "", log.LstdFlags)
+	}
 	err = http.ListenAndServe(g.Cfgs.ListenHTTP, proxy)
 	if err != nil {
 		log.Println(fmt.Sprintf("[error] http.ListenAndServe -%s-", g.Cfgs.ListenHTTP), err)
